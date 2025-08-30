@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>yum.chive</title>
+<style>
+  /* 전체 기본 및 레이아웃 */
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; width:100%; }
+  body {
+    font-family: 'Arial', sans-serif;
+    background: #fffbe7;
+    color: #4e3900;
+    font-size: 16px;
+    margin: 0;
+    padding-bottom: 62px; /* 하단 내비 바 공간 확보 */
+    min-height:100vh;
+  }
+  a {text-decoration: none; color: inherit;}
+
+  /* 상단 바 */
+  header.app-header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    background: #ffda3c;
+    border-bottom: 2px solid #ecc700;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    z-index: 1100;
+    box-shadow: 0 2px 8px rgba(255,218,60,0.15);
+  }
+  #logo {
+    height: 34px;
+    width: 108px;
+    background: #fffde8;
+    border: 1.8px solid #e7be17;
+    border-radius: 7px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+  #appTitle {
+    margin-left: 18px;
+    font-weight: bold;
+    font-size: 1.32rem;
+    flex-grow: 1;
+    text-align: left;
+    color: #4e3900;
+    user-select:none;
+  }
+
+  /* 메인 콘텐츠 컨테이너 */
+  main#appContent {
+    padding: 70px 8px 88px;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  /* 필터 토글 버튼 */
+  #filterToggleBtn {
+    display: block;
+    width: 100%;
+    background: #ffe065;
+    border: none;
+    border-radius: 19px;
+    padding: 16px 0 15px 0;
+    font-weight: bold;
+    font-size: 1.15rem;
+    color: #856300;
+    cursor: pointer;
+    margin-bottom: 18px;
+    margin-top:0;
+    user-select:none;
+    box-shadow: 0 2.5px 10px rgba(250,193,58,0.28);
+    letter-spacing: 0.04em;
+  }
+  #filterToggleBtn.active {
+    background: #d5ad00;
+    color: #fff;
+  }
+
+  /* 필터 패널 오버레이 */
+  #filterOverlay {
+    position:fixed; z-index:1510; left:0; top:0; right:0; bottom:0;
+    background:rgba(0,0,0,0.33);
+    display:none;
+    align-items:center; justify-content:center;
+    padding:0;
+  }
+  #filterOverlay.active {display:flex;}
+  section#filters {
+    background: #fff0a0;
+    border-radius: 22px;
+    padding: 22px 14px 20px 14px;
+    min-width:260px; max-width:390px;
+    box-shadow: 0 4px 28px rgba(255, 215, 0, 0.31);
+    margin: 0 20px; position:relative;
+    overflow: visible;
+    display:block;
+    animation: filterdrop .2s cubic-bezier(.54,1.6,.52,1.05);
+  }
+  @keyframes filterdrop {
+    0% { transform: translateY(-40px); opacity:0; }
+    100% { transform: translateY(0); opacity:1; }
+  }
+  section#filters .filter-group {
+    margin-bottom: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+  section#filters .filter-group:last-child { margin-bottom: 0; }
+  section#filters .filter-label {
+    font-weight: 800;
+    color: #856300;
+    user-select:none;
+    width: 72px;
+    font-size:1.05em;
+  }
+  section#filters .filter-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    width:calc(100% - 75px);
+  }
+  section#filters .filter-buttons button {
+    flex: 1 1 88px;
+    min-width:88px; max-width:130px;
+    padding: 10px 10px;
+    font-size: 1.05em;
+    border: none;
+    border-radius: 13px;
+    cursor: pointer;
+    background-color: #ffe065;
+    font-weight: bold;
+    color: #856300;
+    white-space: nowrap;
+    box-shadow: 0 1.5px 6px rgba(0,0,0,0.08);
+    margin-bottom:2px;
+    margin-top:2px;
+    transition: background-color 0.23s, color 0.23s;
+    letter-spacing:0.01em;
+  }
+  section#filters .filter-buttons button.active {
+    background-color: #d5ad00;
+    color: #fff;
+  }
+  button#clearFilters {
+    background: #d5ad00;
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    font-weight: 800;
+    padding: 14px 0 13px 0;
+    width: 100%;
+    cursor: pointer;
+    font-size: 1.08em;
+    margin-top: 19px;
+    box-shadow: 0 3px 9px rgba(210,173,0,0.59);
+    transition: background 0.2s;
+    user-select:none;
+  }
+  button#clearFilters:active {background:#be9306;}
+
+  button.filterCloseBtn {
+    position:absolute;
+    right:8px; top:7px;
+    border:none; background:none; color:#947601;
+    font-size:2.3em; font-weight:bold; outline:none;
+    width:34px; height:34px; border-radius:50%; line-height:1;
+    cursor:pointer; z-index:20;
+    transition: background .2s;
+  }
+  button.filterCloseBtn:active {background:#ffe598;}
+  
+
+  /* 카드 리스트 */
+  ul.restaurant-list {
+    list-style: none;
+    padding: 0; margin: 0;
+    width:100%;
+  }
+  ul.restaurant-list li.card {
+    background: #fffde8;
+    border-radius: 19px;
+    box-shadow: 0 3px 17px rgba(250,193,58,0.18);
+    display: flex;
+    gap: 18px;
+    padding: 18px 18px 16px 13px;
+    margin: 20px 0 0 0;
+    cursor: pointer;
+    align-items: center;
+    transition: box-shadow 0.18s;
+    min-height:109px;
+  }
+  ul.restaurant-list li.card:hover,
+  ul.restaurant-list li.card:focus-visible {
+    box-shadow: 0 8px 20px rgba(250,193,58,0.31);
+    outline: none;
+  }
+  .card img.thumb {
+    flex-shrink: 0;
+    width: 90px; height: 90px;
+    border-radius: 13px;
+    object-fit: cover;
+    background:#f2e9b7;
+  }
+  .card .info {
+    flex-grow: 1;
+  }
+  .card .info h3 {
+    margin: 0 0 7px 0;
+    font-size: 1.23em;
+    font-weight: 900;
+    color: #856300;
+    letter-spacing: -0.01em;
+  }
+  .card .info p {
+    margin: 1.5px 0;
+    font-size: 1.01em;
+    color: #645400;
+    line-height: 1.3;
+    font-weight: 500;
+  }
+
+  /* 페이지네이션 */
+  .pagination {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin: 26px 0 10px 0;
+    align-items: center;
+  }
+  .pagination button {
+    background: #ffe065;
+    color: #856301;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 1.07em;
+    padding: 7px 15px;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+  }
+  .pagination button.active, .pagination button:focus {
+    background: #d5ad00;
+    color: #fff;
+    outline:none;
+  }
+
+  /* 상세 오버레이 */
+  #detailOverlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.55);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1530;
+    padding: 16px;
+    text-align:left;
+  }
+  #detailOverlay.active { display: flex; }
+  #detailCard {
+    background: #fffde8;
+    border-radius: 18px;
+    max-width: 410px;
+    width: 100%;
+    padding: 24px 20px 20px 20px;
+    box-shadow: 0 6px 32px rgba(250,193,58,0.37);
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+  }
+  #detailCard h2 {
+    margin-top: 0; margin-bottom:4px;
+    font-size: 1.32rem;
+    font-weight: 800;
+    color: #856300;
+    text-align: left;
+  }
+  #detailCard img {
+    display: block;
+    margin: 16px auto 6px auto;
+    width: 92%;
+    max-height: 189px;
+    object-fit: cover;
+    border-radius: 12px;
+    background:#f3edbe;
+  }
+  #detailCard p {
+    font-size: 1.06em;
+    line-height: 1.52;
+    margin: 8px 0 7px 0;
+    color: #654920;
+    word-break:keep-all;
+  }
+  #detailCard .closeBtn {
+    position: absolute;
+    top: 13px; right: 15px;
+    background: #d5ad00;
+    border: none;
+    color: #fff;
+    font-weight: 900;
+    font-size: 22px;
+    width: 39px; height: 39px;
+    border-radius: 50%;
+    cursor: pointer;
+    line-height: 1;
+    z-index:31;
+  }
+  #detailCard .closeBtn:active {background:#9e8207;}
+
+  /* 하단 네비게이션 */
+  nav.app-nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 66px;
+    background: #ffda3c;
+    border-top: 2px solid #ecc700;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    box-shadow: 0 -2px 12px rgba(255,218,60,0.18);
+    z-index: 1600;
+  }
+  nav.app-nav button {
+    background: none;
+    border: none;
+    color: #4e3900;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    flex-grow: 1;
+    padding: 11px 3px 9px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    user-select: none;
+    transition: color 0.24s;
+  }
+  nav.app-nav button.active {
+    color: #d5ad00;
+  }
+  nav.app-nav button span.icon {
+    font-size: 27px;
+    margin-bottom: 2px;
+    line-height: 1;
+    filter: drop-shadow(0 1.5px 1.4px #fff48879);
+  }
+</style>
+</head>
+<body>
+<header class="app-header">
+  <img id="logo" src="https://www.konkuk.ac.kr/sites/konkuk/images/common/logo-top-color.png" alt="건국대학교 로고" />
+  <div id="appTitle">yum.chive</div>
+</header>
+
+<main id="appContent" role="main" tabindex="-1">
+
+  <!-- 필터 토글 버튼 -->
+  <button id="filterToggleBtn" aria-expanded="false" aria-controls="filters" aria-label="필터 열기">필터</button>
+
+  <!-- 필터 오버레이 -->
+  <div id="filterOverlay">
+    <section id="filters" aria-label="맛집 필터">
+      <button class="filterCloseBtn" aria-label="필터 닫기">&times;</button>
+      <div class="filter-group">
+        <div class="filter-label">위치</div>
+        <div class="filter-buttons" id="filterRegion"></div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">기호</div>
+        <div class="filter-buttons" id="filterTag"></div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">가격</div>
+        <div class="filter-buttons" id="filterPrice"></div>
+      </div>
+      <button type="button" id="clearFilters" aria-label="필터 초기화">필터 초기화</button>
+    </section>
+  </div>
+
+  <!-- 맛집 리스트 -->
+  <ul class="restaurant-list" id="restaurantList" aria-live="polite" aria-relevant="additions"></ul>
+  <div class="pagination" id="pagination"></div>
+</main>
+
+<!-- 상세 오버레이 -->
+<div id="detailOverlay" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+  <div id="detailCard" tabindex="0">
+    <button class="closeBtn" aria-label="상세 정보 닫기">&times;</button>
+    <h2 id="detailTitle"></h2>
+    <img alt="" id="detailImage" />
+    <p id="detailDescription"></p>
+    <p id="detailLocation"></p>
+    <p id="detailTags"></p>
+    <p id="detailExtra"></p>
+  </div>
+</div>
+
+<!-- 하단 내비게이션 -->
+<nav class="app-nav" aria-label="주요 메뉴">
+  <button type="button" id="navHome" class="active" aria-current="page">
+    <span class="icon">🏠</span>홈
+  </button>
+  <button type="button" id="navCommunity">
+    <span class="icon">💬</span>커뮤니티
+  </button>
+  <button type="button" id="navRanking">
+    <span class="icon">🏆</span>랭킹
+  </button>
+  <button type="button" id="navNotice">
+    <span class="icon">📢</span>공지
+  </button>
+</nav>
+
+<script>
+const WHITE_IMG = "https://via.placeholder.com/90x90/FFFFFF/FFFFFF?text=+";
+const data = {
+  "건대입구": [
+    {name:"송화산시도삭면",menu:"비빔밥",addr:"서울 광진구 화양동 123-10",type:"한식",img:"https://ldb-phinf.pstatic.net/20171222_273/1513909993152wbpV8_JPEG/fM-4sk2LkYUe0jmd83plu51X.JPG.jpg",tags:["vegan"]},
+    {name:"정면 건대",menu:"우동",addr:"서울 광진구 자양동 456-5",type:"일식",img:"https://ldb-phinf.pstatic.net/20221105_150/1667640635518fdmMX_JPEG/01_%25BE%25D7%25BC%25C7%25C4%25C6-6.jpg",tags:[]},
+    {name:"모츠커피 건대",menu:"초밥",addr:"서울 광진구 화양동 78-3",type:"일식·카페",img:"https://ldb-phinf.pstatic.net/20240910_185/1725956101822qU4L5_JPEG/KakaoTalk_Photo_2023-01-31-13-38-33.jpeg",tags:["vegan","under10k"]},
+    {name:"하이디라오 건대점",menu:"닭한마리",addr:"서울 광진구 자양동 9-7",type:"중식",img:"https://naverbooking-phinf.pstatic.net/20231025_91/1698209935312gkRt7_JPEG/%25CB%25EF%25D3%25DE%25EF%25C1.jpg",tags:["halal"]},
+    {name:"우마이도 건대점",menu:"까르보나라",addr:"서울 광진구 군자역로 6-8",type:"양식",img:"https://ldb-phinf.pstatic.net/20250508_188/1746671048632zEGis_PNG/1000058982.png",tags:[]},
+    {name:"미분당 건대",menu:"스테이크",addr:"서울 광진구 능동로 20-11",type:"양식",img:"https://ldb-phinf.pstatic.net/20240312_21/1710250327869PUFrG_JPEG/IMG_0124.jpeg",tags:["glutenfree"]},
+    {name:"계탄집",menu:"짬뽕",addr:"서울 광진구 어린이대공원로 11-4",type:"중식",img:"https://pup-review-phinf.pstatic.net/MjAyNTA4MDNfMzYg/MDAxNzU0MjA5MDM4NjA0.JPEG/1000061462.jpg",tags:[]},
+    {name:"핵밥 건대점",menu:"돈카츠",addr:"서울 광진구 건국대로 15-2",type:"일식",img:"https://ldb-phinf.pstatic.net/20250424_271/1745462663087VrIBz_JPEG/14.jpg",tags:["vegan","under10k"]},
+    {name:"고베규카츠 건대본점",menu:"비빔밥",addr:"서울 광진구 자양로 122-6",type:"한식",img:"https://ldb-phinf.pstatic.net/20230329_272/1680084605093YCtTI_JPEG/KakaoTalk_20230329_174932601_04.jpg",tags:[]}
+  ],
+  "중문": [
+    {name:"두찜 건대점",menu:"찜닭",addr:"서울 광진구 중곡동 12-3",type:"한식",img:WHITE_IMG,tags:[]},
+    {name:"정면 국수",menu:"국수",addr:"서울 광진구 중곡동 8-9",type:"한식",img:WHITE_IMG,tags:[]},
+    {name:"내가찜한닭 건국대점",menu:"닭갈비",addr:"서울 광진구 군자동 14-1",type:"한식",img:WHITE_IMG,tags:[]}
+  ],
+  "후문": [
+    {name:"시홍쓰 건대",menu:"볶음밥",addr:"서울 광진구 후문로 112-5",type:"중식",img:"https://ldb-phinf.pstatic.net/20220712_282/16576252274583ilfO_JPEG/2AA67F98-63C8-482B-A6B3-7E3DAD363062.jpeg",tags:[]},
+    {name:"새로이 건대",menu:"버거",addr:"서울 광진구 후문로 130-2",type:"버거류",img:WHITE_IMG,tags:[]},
+    {name:"래빗홀 버거컴퍼니 건대",menu:"핸드메이드 버거",addr:"서울 광진구 후문길 18-7",type:"버거류",img:WHITE_IMG,tags:["under10k"]}
+  ],
+  "어린이대공원": [
+    {name:"에이뿔램 군자점",menu:"양고기구이",addr:"서울 광진구 군자동 50-1",type:"양식",img:WHITE_IMG,tags:[]},
+    {name:"수퍼슬라이더스",menu:"버거",addr:"서울 광진구 어린이대공원로 15-6",type:"버거류",img:WHITE_IMG,tags:["under10k"]},
+    {name:"혼다라멘",menu:"라멘",addr:"서울 광진구 자양동 20-4",type:"일식",img:WHITE_IMG,tags:[]},
+    {name:"초라멘",menu:"라멘",addr:"서울 광진구 어린이대공원로 22-8",type:"일식",img:WHITE_IMG,tags:["glutenfree"]},
+    {name:"꾸아 건대점",menu:"베트남 쌀국수",addr:"서울 광진구 광진로 88-9",type:"아시아식",img:WHITE_IMG,tags:["vegan"]},
+    {name:"오마카세 오사이초밥 건대본점",menu:"초밥",addr:"서울 광진구 군자역로 77-12",type:"일식",img:WHITE_IMG,tags:[]}
+  ]
+};
+
+let currentView = "home";
+let currentCategory = "";
+let currentDietTags = [];
+let currentPrice = "";
+let restaurantClicks = JSON.parse(localStorage.getItem('restaurantClicks') || '{}');
+let currentPage = 1;
+
+// 요소 참조
+const filterToggleBtn = document.getElementById('filterToggleBtn');
+const filterOverlay = document.getElementById('filterOverlay');
+const filtersSection = document.getElementById('filters');
+const filterRegionEl = document.getElementById('filterRegion');
+const filterTagEl = document.getElementById('filterTag');
+const filterPriceEl = document.getElementById('filterPrice');
+const clearFiltersBtn = document.getElementById('clearFilters');
+const filterCloseBtn = filtersSection.querySelector('.filterCloseBtn');
+
+const restaurantListEl = document.getElementById('restaurantList');
+const paginationEl = document.getElementById('pagination');
+const detailOverlay = document.getElementById('detailOverlay');
+const detailCard = document.getElementById('detailCard');
+const detailTitle = document.getElementById('detailTitle');
+const detailImage = document.getElementById('detailImage');
+const detailDescription = document.getElementById('detailDescription');
+const detailLocation = document.getElementById('detailLocation');
+const detailTags = document.getElementById('detailTags');
+const detailExtra = document.getElementById('detailExtra');
+const detailCloseBtn = detailCard.querySelector('.closeBtn');
+const navButtons = {
+  home: document.getElementById('navHome'),
+  community: document.getElementById('navCommunity'),
+  ranking: document.getElementById('navRanking'),
+  notice: document.getElementById('navNotice'),
+};
+
+const regions = ["건대입구", "중문", "후문", "어린이대공원"];
+const dietTags = ["vegan", "halal", "glutenfree", "allergy"];
+const priceRanges = [
+  { key: "under7k", label: "7,000원 이하" },
+  { key: "under14k", label: "14,000원 이하" },
+  { key: "under20k", label: "20,000원 이하" },
+  { key: "over20k", label: "20,000원 이상" }
+];
+
+// 필터 제어
+function createFilterButtons(container, options, activeList, onClickCallback) {
+  container.innerHTML = "";
+  options.forEach(opt => {
+    let key, label;
+    if (typeof opt === "string") { key = label = opt; }
+    else { key = opt.key; label = opt.label; }
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.dataset.key = key;
+    btn.type = "button";
+    btn.classList.add('filterBtn');
+    if (activeList.includes(key)) btn.classList.add('active');
+    btn.onclick = () => onClickCallback(key, btn);
+    container.appendChild(btn);
+  });
+}
+function onRegionClick(key, btn) {
+  currentCategory = (currentCategory === key) ? "" : key;
+  updateFilterButtons();
+  renderRestaurantList();
+}
+function onDietClick(key, btn) {
+  if (currentDietTags.includes(key)) {
+    currentDietTags = currentDietTags.filter(v => v !== key);
+    btn.classList.remove('active');
+  } else {
+    currentDietTags.push(key);
+    btn.classList.add('active');
+  }
+  renderRestaurantList();
+}
+function onPriceClick(key, btn) {
+  if (currentPrice === key) {
+    currentPrice = "";
+    btn.classList.remove('active');
+  } else {
+    currentPrice = key;
+    Array.from(btn.parentElement.children).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  renderRestaurantList();
+}
+function updateFilterButtons() {
+  Array.from(filterRegionEl.children).forEach(btn => {
+    if (btn.dataset.key === currentCategory) btn.classList.add('active');
+    else btn.classList.remove('active');
+  });
+}
+clearFiltersBtn.onclick = () => {
+  currentCategory = "";
+  currentDietTags = [];
+  currentPrice = "";
+  updateFilterButtons();
+  createFilterButtons(filterTagEl, dietTags, [], onDietClick);
+  createFilterButtons(filterPriceEl, priceRanges, [], onPriceClick);
+  renderRestaurantList();
+};
+// 필터 패널 제어
+filterToggleBtn.onclick = () => {
+  if (detailOverlay.classList.contains('active')) return; // 상세오버레이 우선
+  filterOverlay.classList.add('active');
+  filterToggleBtn.classList.add('active');
+  filterToggleBtn.setAttribute('aria-expanded', 'true');
+  document.body.style.overflow="hidden";
+}
+filterCloseBtn.onclick = () => {
+  filterOverlay.classList.remove('active');
+  filterToggleBtn.classList.remove('active');
+  filterToggleBtn.setAttribute('aria-expanded', 'false');
+  document.body.style.overflow="";
+}
+filterOverlay.onclick = (e) => {
+  if (e.target === filterOverlay) filterCloseBtn.onclick();
+}
+
+// 필터링 및 페이지
+function filterRestaurants() {
+  let list = Object.values(data).flat();
+  if (currentCategory) list = data[currentCategory] || [];
+  if (currentDietTags.length > 0)
+    list = list.filter(r => currentDietTags.every(tag => r.tags.includes(tag)));
+  if (currentPrice) {
+    list = list.filter(r => {
+      if (currentPrice === "under7k") return r.tags.includes("under10k");
+      if (currentPrice === "under14k") return r.tags.includes("under10k");
+      if (currentPrice === "under20k") return r.tags.includes("under20k");
+      if (currentPrice === "over20k") return !r.tags.includes("under20k");
+      return true;
+    });
+  }
+  return list;
+}
+
+// 맛집 리스트 + 페이지네이션 표시
+function renderRestaurantList(page = 1) {
+  if(currentView !== 'home') return;
+  const list = filterRestaurants();
+  const perPage = 10;
+  const numPages = Math.max(1, Math.ceil(list.length/perPage));
+  currentPage = Math.min(page, numPages);
+  const startIdx = (currentPage-1)*perPage;
+  const pageList = list.slice(startIdx, startIdx+perPage);
+
+  restaurantListEl.innerHTML = '';
+  if(pageList.length === 0){
+    restaurantListEl.innerHTML = "<p style='text-align:center; margin-top:40px; color:#a08700;'>조건에 맞는 식당이 없습니다.</p>";
+    paginationEl.innerHTML = '';
+    return;
+  }
+  pageList.forEach(r => {
+    const li = document.createElement('li');
+    li.className = 'card';
+    li.tabIndex = 0;
+    li.setAttribute('role','button');
+    li.setAttribute('aria-label', `${r.name} - ${r.type} - ${r.menu}`);
+    li.innerHTML = `
+      <img class="thumb" src="${r.img || WHITE_IMG}" alt="${r.name} 이미지" />
+      <div class="info">
+        <h3>${r.name}</h3>
+        <p>${r.addr}</p>
+        <p>${r.type} | ${r.menu}</p>
+      </div>
+    `;
+    li.onclick = () => openDetail(r);
+    li.onkeydown = (e) => { if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(r); } };
+    restaurantListEl.appendChild(li);
+  });
+  // 페이지네이션
+  paginationEl.innerHTML = '';
+  if(numPages > 1) {
+    for(let i=1;i<=numPages;i++){
+      const btn = document.createElement('button');
+      btn.textContent = i;
+      if(i===currentPage) btn.classList.add('active');
+      btn.onclick = ()=>{ renderRestaurantList(i); window.scrollTo({top:70, behavior:'smooth'});}
+      paginationEl.appendChild(btn);
+    }
+  }
+}
+
+// 상세 오버레이
+function increaseClick(name) {
+  restaurantClicks[name] = (restaurantClicks[name]||0)+1;
+  localStorage.setItem('restaurantClicks', JSON.stringify(restaurantClicks));
+}
+function openDetail(r) {
+  if(filterOverlay.classList.contains('active')) filterCloseBtn.onclick(); // 필터 끄기 우선
+  detailTitle.textContent = r.name;
+  detailImage.src = r.img || WHITE_IMG;
+  detailImage.alt = r.name + ' 사진';
+  detailDescription.textContent = `대표 메뉴: ${r.menu} (${r.type})`;
+  detailLocation.textContent = `위치: ${r.addr}`;
+  detailTags.textContent = r.tags.length ? `태그: ${r.tags.join(', ')}` : "태그: 없음";
+  detailExtra.textContent = "운영시간: 10:00 ~ 22:00 | 예약, 주차 가능(예시)";
+  detailOverlay.classList.add('active');
+  detailCard.focus();
+  increaseClick(r.name);
+}
+detailCloseBtn.onclick = () => {
+  detailOverlay.classList.remove('active');
+};
+detailOverlay.onclick = (e) => {
+  if (e.target === detailOverlay) detailCloseBtn.onclick();
+};
+
+// 하단 내비게이션
+let lastHomeState = {cat:"",tags:[],price:"",page:1};
+Object.entries(navButtons).forEach(([key, btn]) => {
+  btn.onclick = () => {
+    if(currentView === key) return;
+    Object.values(navButtons).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    Object.values(navButtons).forEach(b => b.removeAttribute('aria-current'));
+    btn.setAttribute('aria-current','page');
+    currentView = key;
+    renderView();
+  };
+});
+
+function renderView() {
+  filterOverlay.classList.remove('active');
+  detailOverlay.classList.remove('active');
+  filterToggleBtn.classList.remove('active');
+  filterToggleBtn.setAttribute('aria-expanded','false');
+  document.body.style.overflow="";
+
+  if(currentView === 'home'){
+    filterToggleBtn.style.display = 'block';
+    restaurantListEl.style.display = 'block';
+    paginationEl.style.display = 'flex';
+
+    renderRestaurantList(currentPage);
+  } else {
+    filterToggleBtn.style.display = 'none';
+    restaurantListEl.innerHTML = '';
+    paginationEl.style.display = 'none';
+
+    let h2 = document.createElement('h2');
+    h2.style.textAlign = 'left';
+    h2.style.color = '#856300';
+    h2.style.fontWeight = "900";
+    h2.style.fontSize = "1.22em";
+    h2.style.margin = "8px 0 20px 7px";
+
+    if(currentView === 'community'){
+      h2.textContent = '커뮤니티';
+      restaurantListEl.appendChild(h2);
+      [
+        {title:"✨ 건대 저렴 맛집 모음",detail:"학생들이 추천하는 건대 저렴 맛집 모음!"},
+        {title:"🥦 비건 식당 리스트",detail:"비건 식단 가능한 식당 정리"},
+        {title:"🍱 가성비 점심 Top 5",detail:"가성비 최고 점심 메뉴 추천글"}
+      ].forEach(item => {
+        let div = document.createElement('div');
+        div.textContent = item.title;
+        div.style.padding = '18px 9px';
+        div.style.borderRadius = '12px';
+        div.style.background='#fffde8';
+        div.style.margin='0 0 14px 0';
+        div.style.fontSize="1.07em";
+        div.style.fontWeight="700";
+        div.style.color="#755d00";
+        div.style.boxShadow="0 2px 5px #f0e17b33";
+        div.style.cursor = 'pointer';
+        div.onclick = () => openSimpleDetail(item.title, item.detail);
+        restaurantListEl.appendChild(div);
+      });
+    } else if(currentView === 'ranking'){
+      h2.textContent = '인기 랭킹';
+      restaurantListEl.appendChild(h2);
+      let ranked = Object.entries(restaurantClicks).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      if(ranked.length === 0){
+        let p = document.createElement('p');
+        p.textContent = '아직 랭킹이 없습니다.';
+        p.style.textAlign = 'center';
+        p.style.color = '#a08700';
+        p.style.margin = '40px 0 0 0'; restaurantListEl.appendChild(p); return;
+      }
+      ranked.forEach(([name, count], idx) => {
+        let div = document.createElement('div');
+        div.style.display = 'flex';
+        div.style.justifyContent = 'space-between';
+        div.style.alignItems = 'center';
+        div.style.padding = '15px 16px';
+        div.style.marginBottom = '8px';
+        div.style.borderRadius = '11px';
+        div.style.background='#fff6c3';
+        div.style.fontWeight='700';
+        div.style.color='#6b4c00';
+        div.style.fontSize='1.03em';
+        div.tabIndex = 0;
+        div.onclick = () => openByName(name);
+        let left = document.createElement('span');
+        left.innerHTML = idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":(idx+1);
+        left.style.marginRight="13px";
+        let nm = document.createElement('span');
+        nm.textContent = name; nm.style.marginRight="7px";
+        let cnt = document.createElement('span'); cnt.textContent=`${count}회`; cnt.style.fontSize="0.95em";
+        div.append(left, nm, cnt);
+        restaurantListEl.appendChild(div);
+      });
+    } else if(currentView === 'notice'){
+      h2.textContent = '공지사항';
+      restaurantListEl.appendChild(h2);
+      [
+        {title:"맛집 추천 받아요!",detail:"맛집 추천 이벤트 진행 중입니다."},
+        {title:"이번 주 할인 이벤트 진행중",detail:"이번 주 일부 식당 20% 할인 중!"},
+        {title:"신규 식당 등록 안내",detail:"신규 식당 등록 안내입니다."}
+      ].forEach(item => {
+        let div = document.createElement('div');
+        div.textContent = item.title;
+        div.style.padding = '18px 9px';
+        div.style.borderRadius = '12px';
+        div.style.background='#fffde8';
+        div.style.margin='0 0 14px 0';
+        div.style.fontSize="1.07em";
+        div.style.fontWeight="700";
+        div.style.color="#755d00";
+        div.style.boxShadow="0 2px 5px #f0e17b33";
+        div.style.cursor = 'pointer';
+        div.onclick = () => openSimpleDetail(item.title, item.detail);
+        restaurantListEl.appendChild(div);
+      });
+    }
+  }
+}
+// 이름으로 식당 상세 열기
+function openByName(name){
+  const all = Object.values(data).flat();
+  const r = all.find(x=>x.name === name);
+  if(r) openDetail(r);
+}
+// 커뮤니티/공지 상세
+function openSimpleDetail(title, detail){
+  if(filterOverlay.classList.contains('active')) filterCloseBtn.onclick();
+  detailTitle.textContent = title;
+  detailImage.src = "";
+  detailImage.alt = "";
+  detailDescription.textContent = detail;
+  detailLocation.textContent = "";
+  detailTags.textContent = "";
+  detailExtra.textContent = "";
+  detailOverlay.classList.add('active');
+  detailCard.focus();
+}
+
+// 필터, 상세, 목록, 내비 초기화
+createFilterButtons(filterRegionEl, regions, [], onRegionClick);
+createFilterButtons(filterTagEl, dietTags, [], onDietClick);
+createFilterButtons(filterPriceEl, priceRanges, [], onPriceClick);
+updateFilterButtons();
+renderRestaurantList();
+renderView();
+</script>
+</body>
+</html>
